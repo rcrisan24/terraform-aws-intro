@@ -1,3 +1,21 @@
+terraform {
+cloud {
+    organization = "Qubiz"
+
+    workspaces {
+      name = "AWS-Intro"
+    }
+  }
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 3.27"
+    }
+  }
+
+  required_version = ">= 1.1.0"
+}
 
 provider "aws" {
   profile = "default"
@@ -5,17 +23,6 @@ provider "aws" {
   access_key = var.aws-access-key
   secret_key = var.aws-secret-key
 }
-
-resource "aws_instance" "app_server" {
-  ami           = "ami-830c94e3"
-  instance_type = "t2.micro"
-
-  tags = {
-    Name = "ExampleAppServerInstance"
-  }
-}
-
-
 
 data "aws_availability_zones" "available_zones" {
   state = "available"
@@ -50,33 +57,6 @@ resource "aws_route" "internet_access" {
   gateway_id             = aws_internet_gateway.gateway.id
 }
 
-resource "aws_eip" "gateway" {
-  count      = 2
-  vpc        = true
-  depends_on = [aws_internet_gateway.gateway]
-}
-
-resource "aws_nat_gateway" "gateway" {
-  count         = 2
-  subnet_id     = element(aws_subnet.public.*.id, count.index)
-  allocation_id = element(aws_eip.gateway.*.id, count.index)
-}
-
-resource "aws_route_table" "private" {
-  count  = 2
-  vpc_id = aws_vpc.default.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    nat_gateway_id = element(aws_nat_gateway.gateway.*.id, count.index)
-  }
-}
-
-resource "aws_route_table_association" "private" {
-  count          = 2
-  subnet_id      = element(aws_subnet.private.*.id, count.index)
-  route_table_id = element(aws_route_table.private.*.id, count.index)
-}
 
 resource "aws_security_group" "lb" {
   name        = "example-alb-security-group"
@@ -122,25 +102,74 @@ resource "aws_lb_listener" "hello_world" {
   }
 }
 
+
+resource "aws_iam_role" "ecs_task_execution_role" {
+  name = "workshop-ecsTaskExecutionRole"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role" "ecs_task_role" {
+  name = "workshop-ecsTaskRole"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+
+resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attachment" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
 resource "aws_ecs_task_definition" "hello_world" {
   family                   = "hello-world-app"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = 1024
-  memory                   = 2048
+  cpu                      = 256
+  memory                   = 512
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = <<DEFINITION
 [
   {
-    "image": "heroku/nodejs-hello-world",
-    "cpu": 1024,
-    "memory": 2048,
+    "image": "813017864691.dkr.ecr.us-west-2.amazonaws.com/workshop-ecr:latest",
+    "cpu": 256,
+    "memory": 512,
     "name": "hello-world-app",
     "networkMode": "awsvpc",
     "portMappings": [
       {
-        "containerPort": 3000,
-        "hostPort": 3000
+        "containerPort": 8080,
+        "hostPort": 8080
       }
     ]
   }
@@ -154,8 +183,8 @@ resource "aws_security_group" "hello_world_task" {
 
   ingress {
     protocol        = "tcp"
-    from_port       = 3000
-    to_port         = 3000
+    from_port       = 8080
+    to_port         = 8080
     security_groups = [aws_security_group.lb.id]
   }
 
@@ -164,6 +193,15 @@ resource "aws_security_group" "hello_world_task" {
     from_port   = 0
     to_port     = 0
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_ecr_repository" "main" {
+  name                 = "workshop-ecr"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = false
   }
 }
 
@@ -186,7 +224,7 @@ resource "aws_ecs_service" "hello_world" {
   load_balancer {
     target_group_arn = aws_lb_target_group.hello_world.id
     container_name   = "hello-world-app"
-    container_port   = 3000
+    container_port   = 8080
   }
 
   depends_on = [aws_lb_listener.hello_world]
