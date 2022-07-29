@@ -1,9 +1,9 @@
 terraform {
-cloud {
-    organization = "Qubiz"
+  cloud {
+    organization = "qubiz-aws-2022"
 
     workspaces {
-      name = "AWS-Intro"
+      name = "aws-workshop-summer"
     }
   }
 
@@ -19,7 +19,7 @@ cloud {
 
 provider "aws" {
   profile = "default"
-  region  = "us-west-2"
+  region  = "eu-west-2"
   access_key = var.aws-access-key
   secret_key = var.aws-secret-key
 }
@@ -31,15 +31,23 @@ resource "aws_ecr_repository" "main" {
   image_scanning_configuration {
     scan_on_push = false
   }
+
+  tags = {
+    Name = "${var.name}-ecr"
+  }
 }
 
 resource "aws_ecs_cluster" "main" {
   name = "workshop-cluster"
+
+  tags = {
+    Name = "${var.name}-cluster"
+  }
 }
 
 module "vpc" {
   source = "./vpc"
-  lb_id = module.lb.lb_id
+  name = var.name
 }
 
 module "lb" {
@@ -47,15 +55,21 @@ module "lb" {
   public_subnets_ids =  module.vpc.public_subnets_ids
   vpc_id = module.vpc.vpc_id
   security_group_id = module.vpc.lb_security_group
+  name = var.name
 }
 
 module "iam" {
   source = "./iam"
 }
 
-# module "raoul-services" {
-#   source = "./raoul-services"
-#   ecs_cluster_id = aws_ecs_cluster.main.id
-#   subnets = module.vpc.private_subnets_ids
-#   target_group_arn = module.lb.target_group_arn
-# }
+module "raoul-services" {
+  source = "./raoul-services"
+  ecs_cluster_id = aws_ecs_cluster.main.id
+  public_subnets_ids = module.vpc.public_subnets_ids
+  target_group_arn = module.lb.target_group_arn
+  name = var.name
+  ecs_task_execution_role = module.iam.ecs_task_execution_role_arn
+  ecs_task_role = module.iam.ecs_task_execution_role_arn
+  security_group_id = module.vpc.ecs_task_sg_id
+  lb_listener = module.lb.lb_listener
+}

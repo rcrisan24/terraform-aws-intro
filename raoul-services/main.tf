@@ -11,7 +11,7 @@ resource "aws_ecs_task_definition" "hello_world" {
   container_definitions = <<DEFINITION
 [
   {
-    "image": "813017864691.dkr.ecr.us-west-2.amazonaws.com/workshop-ecr:latest",
+    "image": "716588360133.dkr.ecr.eu-west-2.amazonaws.com/workshop-ecr:latest",
     "cpu": 256,
     "memory": 512,
     "name": "hello-world-app",
@@ -25,6 +25,11 @@ resource "aws_ecs_task_definition" "hello_world" {
   }
 ]
 DEFINITION
+
+tags = {
+    Name = "${var.name}-task-definition"
+  }
+
 }
 
 
@@ -32,12 +37,13 @@ resource "aws_ecs_service" "hello_world" {
   name            = "hello-world-service"
   cluster         = var.ecs_cluster_id
   task_definition = aws_ecs_task_definition.hello_world.arn
-  desired_count   = var.app_count
+  desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    security_groups = [aws_security_group.hello_world_task.id]
-    subnets         = var.private_subnets_ids
+    security_groups = [var.security_group_id]
+    subnets         = var.public_subnets_ids
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -46,5 +52,9 @@ resource "aws_ecs_service" "hello_world" {
     container_port   = 8080
   }
 
-  depends_on = [aws_lb_listener.hello_world]
+  depends_on = [var.lb_listener]
+
+  tags = {
+    Name = "${var.name}-task"
+  }
 }

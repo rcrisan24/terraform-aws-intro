@@ -4,6 +4,10 @@ data "aws_availability_zones" "available_zones" {
 
 resource "aws_vpc" "default" {
   cidr_block = "10.32.0.0/16"
+
+  tags = {
+    Name = "${var.name}-vpc"
+  }
 }
 
 resource "aws_subnet" "public" {
@@ -12,6 +16,10 @@ resource "aws_subnet" "public" {
   availability_zone       = data.aws_availability_zones.available_zones.names[count.index]
   vpc_id                  = aws_vpc.default.id
   map_public_ip_on_launch = true
+
+  tags = {
+    Name = "${var.name}-public-subnet"
+  }
 }
 
 resource "aws_subnet" "private" {
@@ -19,10 +27,18 @@ resource "aws_subnet" "private" {
   cidr_block        = cidrsubnet(aws_vpc.default.cidr_block, 8, count.index)
   availability_zone = data.aws_availability_zones.available_zones.names[count.index]
   vpc_id            = aws_vpc.default.id
+
+  tags = {
+    Name = "${var.name}-private-subnet"
+  }
 }
 
 resource "aws_internet_gateway" "gateway" {
   vpc_id = aws_vpc.default.id
+
+  tags = {
+    Name = "${var.name}-igw"
+  }
 }
 
 resource "aws_route" "internet_access" {
@@ -33,7 +49,7 @@ resource "aws_route" "internet_access" {
 
 
 resource "aws_security_group" "lb" {
-  name        = "example-alb-security-group"
+  name        = "${var.name}-alb-sg"
   vpc_id      = aws_vpc.default.id
 
   ingress {
@@ -49,18 +65,22 @@ resource "aws_security_group" "lb" {
     protocol  = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = "${var.name}-sg-lb"
+  }
 }
 
 
 resource "aws_security_group" "hello_world_task" {
-  name        = "example-task-security-group"
+  name        = "${var.name}-task-sg"
   vpc_id      = aws_vpc.default.id
 
   ingress {
     protocol        = "tcp"
     from_port       = 8080
     to_port         = 8080
-    security_groups = [var.lb_id]
+    security_groups = [aws_security_group.lb.id]
   }
 
   egress {
@@ -68,6 +88,10 @@ resource "aws_security_group" "hello_world_task" {
     from_port   = 0
     to_port     = 0
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.name}-vpc"
   }
 }
 
@@ -89,4 +113,8 @@ output "private_subnets_ids" {
 
 output "lb_security_group" {
   value = aws_security_group.lb.id
+}
+
+output "ecs_task_sg_id" {
+  value = aws_security_group.hello_world_task.id
 }

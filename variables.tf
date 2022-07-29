@@ -10,3 +10,7 @@ variable "app_count" {
   type = number
   default = 1
 }
+
+variable "name" {
+  default = "aws-workshop-summer"
+}

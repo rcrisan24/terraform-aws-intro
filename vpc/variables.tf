@@ -1,3 +1,3 @@
-variable "lb_id" {
-  
+variable "name" {
+
 }

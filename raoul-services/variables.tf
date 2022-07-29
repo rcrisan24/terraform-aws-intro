@@ -10,10 +10,20 @@ variable "ecs_cluster_id" {
   
 }
 
-variable "private_subnets_ids" {
+variable "public_subnets_ids" {
   
 }
 
 variable "target_group_arn" {
   
 }
+
+variable "name" {
+    
+}
+
+variable "security_group_id" {
+
+}
+
+variable "lb_listener" {}
