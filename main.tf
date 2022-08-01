@@ -72,4 +72,18 @@ module "raoul-services" {
   ecs_task_role = module.iam.ecs_task_execution_role_arn
   security_group_id = module.vpc.ecs_task_sg_id
   lb_listener = module.lb.lb_listener
+  service_name = "hello-world-app"
+}
+
+
+module "john-services" {
+  source = "./john"
+  ecs_cluster_id = aws_ecs_cluster.main.id
+  public_subnets_ids = module.vpc.public_subnets_ids
+  target_group_arn = module.lb.target_group_arn
+  name = var.name
+  ecs_task_execution_role = module.iam.ecs_task_execution_role_arn
+  ecs_task_role = module.iam.ecs_task_execution_role_arn
+  security_group_id = module.vpc.ecs_task_sg_id
+  lb_listener = module.lb.lb_listener
 }

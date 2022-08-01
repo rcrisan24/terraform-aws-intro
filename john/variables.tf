@@ -27,5 +27,3 @@ variable "security_group_id" {
 }
 
 variable "lb_listener" {}
-
-variable "service_name" {}

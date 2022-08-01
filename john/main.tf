@@ -1,6 +1,6 @@
 
 resource "aws_ecs_task_definition" "hello_world" {
-  family                   = var.service_name
+  family                   = "hello-world-john"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 256
@@ -11,10 +11,10 @@ resource "aws_ecs_task_definition" "hello_world" {
   container_definitions = <<DEFINITION
 [
   {
-    "image": "716588360133.dkr.ecr.eu-west-2.amazonaws.com/workshop-ecr:latest",
+    "image": "716588360133.dkr.ecr.eu-west-2.amazonaws.com/workshop-ecr:john",
     "cpu": 256,
     "memory": 512,
-    "name": "${var.service_name}",
+    "name": "hello-world-john",
     "networkMode": "awsvpc",
     "portMappings": [
       {
@@ -34,7 +34,7 @@ tags = {
 
 
 resource "aws_ecs_service" "hello_world" {
-  name            = var.service_name
+  name            = "hello-world-john-service"
   cluster         = var.ecs_cluster_id
   task_definition = aws_ecs_task_definition.hello_world.arn
   desired_count   = 1
@@ -48,7 +48,7 @@ resource "aws_ecs_service" "hello_world" {
 
   load_balancer {
     target_group_arn = var.target_group_arn
-    container_name   = var.service_name
+    container_name   = "hello-world-john"
     container_port   = 8080
   }
 
